@@ -9,3 +9,6 @@ build: format
 
 format:
 	gofmt -s -w ./cmd
+
+clean:
+	rm srr scsa scsb sds
