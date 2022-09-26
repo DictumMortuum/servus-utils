@@ -2,26 +2,13 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/DictumMortuum/servus/pkg/models"
 	"github.com/heetch/confita"
 	"github.com/heetch/confita/backend/file"
-	"github.com/jmoiron/sqlx"
 	"github.com/ziutek/telnet"
 	"log"
 	"regexp"
-	"strconv"
-	"strings"
-	"time"
 )
-
-type Config struct {
-	Databases map[string]string `config:"databases"`
-	Host      string            `config:"host"`
-	Modem     string            `config:"modem"`
-	User      string            `config:"user"`
-	Pass      string            `config:"pass"`
-}
 
 var (
 	Cfg           Config
@@ -37,63 +24,12 @@ var (
 	re_snr        = regexp.MustCompile(`Noise Margin\(dB\)[ :]+([\d\.]+)\s+([\d\.]+)`)
 )
 
-const timeout = 20 * time.Second
-
-func expect(t *telnet.Conn, d ...string) error {
-	err := t.SetReadDeadline(time.Now().Add(timeout))
-	if err != nil {
-		return err
-	}
-
-	err = t.SkipUntil(d...)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func sendln(t *telnet.Conn, s string) error {
-	err := t.SetWriteDeadline(time.Now().Add(timeout))
-	if err != nil {
-		return err
-	}
-
-	buf := make([]byte, len(s)+1)
-	copy(buf, s)
-	buf[len(s)] = '\n'
-
-	_, err = t.Write(buf)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func sendSlowly(t *telnet.Conn, s string) error {
-	err := t.SetWriteDeadline(time.Now().Add(timeout))
-	if err != nil {
-		return err
-	}
-
-	for _, c := range s {
-		_, err = t.Write([]byte(string(c)))
-		if err != nil {
-			return err
-		}
-
-		time.Sleep(500 * time.Millisecond)
-	}
-
-	return nil
-}
-
 func getStats(host, user, password string) (string, error) {
 	t, err := telnet.Dial("tcp", host)
 	if err != nil {
 		return "", err
 	}
+	defer t.Close()
 
 	t.SetUnixWriteMode(true)
 	var data []byte
@@ -134,21 +70,6 @@ func getStats(host, user, password string) (string, error) {
 	}
 
 	return string(data), nil
-}
-
-func atoi(s string) int {
-	i, _ := strconv.Atoi(strings.TrimSpace(s))
-	return i
-}
-
-func atoi64(s string) int64 {
-	i, _ := strconv.ParseInt(strings.TrimSpace(s), 10, 32)
-	return i
-}
-
-func atof(s string) float64 {
-	f, _ := strconv.ParseFloat(s, 64)
-	return f
 }
 
 func parseStats(raw string) *models.Modem {
@@ -219,30 +140,6 @@ func parseStats(raw string) *models.Modem {
 	return &stats
 }
 
-func saveStats(s *models.Modem) error {
-	payload, err := json.Marshal(s)
-	if err != nil {
-		return err
-	}
-
-	db, err := sqlx.Connect("mysql", Cfg.Databases["mariadb"])
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	q := `update tkeyval set json = :json, date = NOW() where id = :id`
-	_, err = db.NamedExec(q, map[string]any{
-		"id":   "TD5130",
-		"json": string(payload),
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func main() {
 	loader := confita.NewLoader(
 		file.NewBackend("/etc/conf.d/servusrc.yml"),
@@ -260,7 +157,7 @@ func main() {
 	}
 
 	s := parseStats(raw)
-	err = saveStats(s)
+	err = saveStats(s, Cfg.Modem)
 	if err != nil {
 		log.Fatal(err)
 	}
