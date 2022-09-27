@@ -190,6 +190,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	s.Host = modem.Host
 	err = saveStats(s, modem.Modem)
 	if err != nil {
 		log.Fatal(err)

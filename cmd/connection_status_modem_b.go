@@ -158,6 +158,7 @@ func main() {
 	}
 
 	s := parseStats(raw)
+	s.Host = modem.Host
 	err = saveStats(s, modem.Modem)
 	if err != nil {
 		log.Fatal(err)
