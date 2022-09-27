@@ -24,7 +24,7 @@ var (
 	re_voip     = regexp.MustCompile(`Status\s+:Enable`)
 )
 
-func parseStats(host, user, password string) (*models.Modem, error) {
+func parseStats(host, user, password, voip string) (*models.Modem, error) {
 	var stats models.Modem
 
 	t, err := telnet.Dial("tcp", host)
@@ -153,7 +153,7 @@ func parseStats(host, user, password string) (*models.Modem, error) {
 		stats.SNRDown = atof(match[2])
 	}
 
-	err = sendln(t, "display waninfo interface "+Cfg.Voip)
+	err = sendln(t, "display waninfo interface "+voip)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +176,6 @@ func parseStats(host, user, password string) (*models.Modem, error) {
 func main() {
 	loader := confita.NewLoader(
 		file.NewBackend("/etc/conf.d/servusrc.yml"),
-		file.NewBackend("/etc/conf.d/modem_a.yml"),
 	)
 
 	err := loader.Load(context.Background(), &Cfg)
@@ -184,12 +183,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	s, err := parseStats(Cfg.Host+":23", Cfg.User, Cfg.Pass)
+	modem := Cfg.Modem["DG8245V-10"]
+
+	s, err := parseStats(modem.Host+":23", modem.User, modem.Pass, modem.Voip)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = saveStats(s, Cfg.Modem)
+	err = saveStats(s, modem.Modem)
 	if err != nil {
 		log.Fatal(err)
 	}

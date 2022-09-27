@@ -143,7 +143,6 @@ func parseStats(raw string) *models.Modem {
 func main() {
 	loader := confita.NewLoader(
 		file.NewBackend("/etc/conf.d/servusrc.yml"),
-		file.NewBackend("/etc/conf.d/modem_b.yml"),
 	)
 
 	err := loader.Load(context.Background(), &Cfg)
@@ -151,13 +150,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	raw, err := getStats(Cfg.Host+":23", Cfg.User, Cfg.Pass)
+	modem := Cfg.Modem["TD5130"]
+
+	raw, err := getStats(modem.Host+":23", modem.User, modem.Pass)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	s := parseStats(raw)
-	err = saveStats(s, Cfg.Modem)
+	err = saveStats(s, modem.Modem)
 	if err != nil {
 		log.Fatal(err)
 	}
