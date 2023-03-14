@@ -27,22 +27,38 @@ func scrapeSingle(db *sqlx.DB, f func() (map[string]any, []map[string]any, error
 		if val, ok := item["name"]; ok {
 			ignore := scrape.Ignore(ignored, val.(string))
 			if !ignore {
-				id, err := scrape.PriceExists(db, item)
+				id, boardgame_id, err := scrape.PriceExists(db, item)
 				if err != nil {
 					return err
 				}
 
+				item["id"] = id
+				item["boardgame_id"] = boardgame_id
+
 				if id != nil {
-					log.Println(item["name"], "is mapped to id ", id)
-					err = scrape.UpdatePrice(db, id, item)
+					err = scrape.UpdatePrice(db, item)
 					if err != nil {
 						return err
 					}
-				} else {
-					log.Println("inserting cached price", item["name"])
-					err := scrape.InsertCachedPrice(db, item)
+
+					mapping_ok, err := scrape.InsertMapping(db, item)
 					if err != nil {
 						return err
+					}
+
+					history_ok, err := scrape.InsertHistories(db, item)
+					if err != nil {
+						return err
+					}
+
+					log.Print(item["name"], "is mapped to id ", id, "...", boardgame_id, "mapping: ", mapping_ok, "history: ", history_ok)
+				} else {
+					log.Println("inserting cached price", item["name"])
+					if item["name"] != "" {
+						err := scrape.InsertCachedPrice(db, item)
+						if err != nil {
+							return err
+						}
 					}
 				}
 			}

@@ -71,7 +71,23 @@ func SetIgnored(db *sqlx.DB, name string) error {
 }
 
 func InsertCachedPrice(db *sqlx.DB, payload map[string]any) error {
-	q := `insert into tboardgamepricescached (name,store_id,store_thumb,price,stock,url) values (:name,:store_id,:store_thumb,:price,:stock,:url)`
+	q := `
+		insert into tboardgamepricescached (
+			name,
+			store_id,
+			store_thumb,
+			price,
+			stock,
+			url
+		) values (
+			:name,
+			:store_id,
+			:store_thumb,
+			:price,
+			:stock,
+			:url
+		) on duplicate key update id = id
+	`
 	_, err := db.NamedExec(q, payload)
 	if err != nil {
 		return err
@@ -100,35 +116,38 @@ func DeleteCachedPrice(db *sqlx.DB, id int64) error {
 	return nil
 }
 
-func PriceExists(db *sqlx.DB, payload map[string]any) (*sql.NullInt64, error) {
-	var id sql.NullInt64
+func PriceExists(db *sqlx.DB, payload map[string]any) (*sql.NullInt64, *sql.NullInt64, error) {
+	type result struct {
+		Id          sql.NullInt64 `db:"id"`
+		BoardgameId sql.NullInt64 `db:"boardgame_id"`
+	}
 
-	q := `select id from tboardgameprices where store_id = :store_id and name = :name and boardgame_id is not null`
+	var rs result
+
+	q := `select id, boardgame_id from tboardgameprices where store_id = :store_id and name = :name and boardgame_id is not null`
 	stmt, err := db.PrepareNamed(q)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer stmt.Close()
 
-	err = stmt.Get(&id, payload)
+	err = stmt.Get(&rs, payload)
 	if err == sql.ErrNoRows {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	_, err = db.NamedExec(q, payload)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &id, nil
+	return &rs.Id, &rs.BoardgameId, nil
 }
 
-func UpdatePrice(db *sqlx.DB, id *sql.NullInt64, payload map[string]any) error {
-	payload["id"] = id
-
+func UpdatePrice(db *sqlx.DB, payload map[string]any) error {
 	q := `
 		update
 			tboardgameprices
@@ -147,4 +166,58 @@ func UpdatePrice(db *sqlx.DB, id *sql.NullInt64, payload map[string]any) error {
 	}
 
 	return nil
+}
+
+func InsertMapping(db *sqlx.DB, payload map[string]any) (bool, error) {
+	q := `
+		insert into tboardgamepricesmap (
+			boardgame_id,
+			name
+		) values (
+			:boardgame_id,
+			:name
+		) on duplicate key update id = id
+	`
+
+	rs, err := db.NamedExec(q, payload)
+	if err != nil {
+		return false, err
+	}
+
+	rows, err := rs.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+
+	return rows > 0, nil
+}
+
+func InsertHistories(db *sqlx.DB, payload map[string]any) (bool, error) {
+	q := `
+		insert into	tboardgamepriceshistory (
+			boardgame_id,
+			cr_date,
+			price,
+			stock,
+			store_id
+		) values (
+			:boardgame_id,
+			date_add(date_add(LAST_DAY(NOW()), interval 1 day), interval -1 month),
+			:price,
+			:stock,
+			:store_id
+		) on duplicate key update id = id
+	`
+
+	rs, err := db.NamedExec(q, payload)
+	if err != nil {
+		return false, err
+	}
+
+	rows, err := rs.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+
+	return rows > 0, nil
 }
