@@ -22,6 +22,8 @@ func scrapeSingle(db *sqlx.DB, f func() (map[string]any, []map[string]any, error
 	if err != nil {
 		return err
 	}
+	cached := 0
+	updated := 0
 
 	for _, item := range rs {
 		if val, ok := item["name"]; ok {
@@ -51,20 +53,26 @@ func scrapeSingle(db *sqlx.DB, f func() (map[string]any, []map[string]any, error
 						return err
 					}
 
-					log.Print(item["name"], "is mapped to id ", id, "...", boardgame_id, "mapping: ", mapping_ok, "history: ", history_ok)
+					if mapping_ok || history_ok {
+						log.Print(item["name"], "is mapped to id ", id, "...", boardgame_id)
+						updated++
+					}
 				} else {
-					log.Println("inserting cached price", item["name"])
 					if item["name"] != "" {
+						log.Println("inserting cached price", item["name"])
 						err := scrape.InsertCachedPrice(db, item)
 						if err != nil {
 							return err
 						}
+						cached++
 					}
 				}
 			}
 		}
 	}
 
+	metadata["cached"] = cached
+	metadata["updated"] = updated
 	log.Println(metadata)
 	return nil
 }
