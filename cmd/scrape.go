@@ -59,12 +59,15 @@ func scrapeSingle(db *sqlx.DB, f func() (map[string]any, []map[string]any, error
 					}
 				} else {
 					if item["name"] != "" {
-						log.Println("inserting cached price", item["name"])
-						err := scrape.InsertCachedPrice(db, item)
+						cached_ok, err := scrape.InsertCachedPrice(db, item)
 						if err != nil {
 							return err
 						}
-						cached++
+
+						if cached_ok {
+							log.Println("inserting cached price", item["name"])
+							cached++
+						}
 					}
 				}
 			}

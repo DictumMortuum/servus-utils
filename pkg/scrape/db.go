@@ -70,7 +70,7 @@ func SetIgnored(db *sqlx.DB, name string) error {
 	return nil
 }
 
-func InsertCachedPrice(db *sqlx.DB, payload map[string]any) error {
+func InsertCachedPrice(db *sqlx.DB, payload map[string]any) (bool, error) {
 	q := `
 		insert into tboardgamepricescached (
 			name,
@@ -88,12 +88,17 @@ func InsertCachedPrice(db *sqlx.DB, payload map[string]any) error {
 			:url
 		) on duplicate key update id = id
 	`
-	_, err := db.NamedExec(q, payload)
+	rs, err := db.NamedExec(q, payload)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	return nil
+	rows, err := rs.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+
+	return rows > 0, nil
 }
 
 func CleanCachedPrices(db *sqlx.DB, id int) error {
