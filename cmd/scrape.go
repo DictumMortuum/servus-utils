@@ -106,14 +106,26 @@ func main() {
 		Commands: []*cli.Command{
 			{
 				Name: "scrape",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "store",
+						Value: "",
+					},
+				},
 				Action: func(ctx *cli.Context) error {
-					opts := rofi.GofiOptions{
-						Description: "scraper",
-					}
+					var scrapers []string
+					scraper := ctx.String("store")
+					if scraper != "" {
+						scrapers = []string{scraper}
+					} else {
+						opts := rofi.GofiOptions{
+							Description: "scraper",
+						}
 
-					scrapers, err := rofi.FromInterface(&opts, scrape.Scrapers)
-					if err != nil {
-						return err
+						scrapers, err = rofi.FromInterface(&opts, scrape.Scrapers)
+						if err != nil {
+							return err
+						}
 					}
 
 					for _, val := range scrapers {
