@@ -2,18 +2,37 @@ package scrape
 
 import (
 	"database/sql"
-	// "github.com/DictumMortuum/servus/pkg/models"
 	"github.com/jmoiron/sqlx"
+	"strings"
 )
 
 type Price struct {
-	Id   int64  `db:"id" json:"id"`
-	Name string `db:"name" json:"name"`
+	Id          int64   `db:"id" json:"id"`
+	StoreId     int64   `db:"store_id" json:"store_id"`
+	BoardgameId int64   `db:"boardgame_id" json:"boardgame_id"`
+	Name        string  `db:"name" json:"name"`
+	Price       float64 `db:"price" json:"price"`
+	Stock       int     `db:"stock" json:"stock"`
+}
+
+type Ignored struct {
+	Name    string `db:"name"`
+	StoreId int64  `db:"store_id"`
 }
 
 func GetPrices(db *sqlx.DB) ([]Price, error) {
 	var rs []Price
-	err := db.Select(&rs, "select id, name from tboardgameprices")
+	err := db.Select(&rs, "select id, store_id, name from tboardgameprices")
+	if err != nil {
+		return nil, err
+	}
+
+	return rs, nil
+}
+
+func GetNewlyMappedPrices(db *sqlx.DB) ([]Price, error) {
+	var rs []Price
+	err := db.Select(&rs, "select id, boardgame_id, store_id, price, stock, name from tboardgameprices where mapped = 0 and boardgame_id is not null")
 	if err != nil {
 		return nil, err
 	}
@@ -23,7 +42,7 @@ func GetPrices(db *sqlx.DB) ([]Price, error) {
 
 func GetCachedPrices(db *sqlx.DB) ([]Price, error) {
 	var rs []Price
-	err := db.Select(&rs, "select id, name from tboardgamepricescached")
+	err := db.Select(&rs, "select id, store_id, name from tboardgamepricescached")
 	if err != nil {
 		return nil, err
 	}
@@ -48,26 +67,81 @@ func IgnorePrice(db *sqlx.DB, id int64) error {
 	return nil
 }
 
-func GetIgnored(db *sqlx.DB) ([]string, error) {
-	var rs []string
-	err := db.Select(&rs, "select name from tboardgamepricesignored")
+func GetIgnored(db *sqlx.DB) ([]Ignored, error) {
+	var rs []Ignored
+	err := db.Select(&rs, "select name, store_id from tboardgamepricesignored")
 	if err != nil {
 		return nil, err
 	}
 
-	return rs, nil
-}
-
-func SetIgnored(db *sqlx.DB, name string) error {
-	q := `insert into tboardgamepricesignored (name) values (:name)`
-	_, err := db.NamedExec(q, map[string]any{
-		"name": name,
-	})
-	if err != nil {
-		return err
+	retval := []Ignored{}
+	for _, item := range rs {
+		check := strings.ToLower(item.Name)
+		check = removeAccents(check)
+		retval = append(retval, Ignored{
+			Name:    check,
+			StoreId: item.StoreId,
+		})
 	}
 
-	return nil
+	return retval, nil
+}
+
+// func SetIgnored(db *sqlx.DB, name string) error {
+// 	q := `insert into tboardgamepricesignored (name) values (:name)`
+// 	_, err := db.NamedExec(q, map[string]any{
+// 		"name": name,
+// 	})
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	return nil
+// }
+
+func CreatePricesFromCachedPrices(db *sqlx.DB) (bool, error) {
+	q := `
+		insert into tboardgameprices (
+			cr_date,
+			boardgame_id,
+			store_id,
+			store_thumb,
+			name,
+			price,
+			stock,
+			url,
+			batch,
+			mapped,
+			ignored
+		)
+		select
+			NOW(),
+			NULL,
+			store_id,
+			store_thumb,
+			name,
+			price,
+			stock,
+			url,
+			1,
+			false,
+			false
+		from
+			tboardgamepricescached
+		on duplicate key update cr_date = NOW()
+	`
+
+	rs, err := db.Exec(q)
+	if err != nil {
+		return false, err
+	}
+
+	rows, err := rs.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+
+	return rows > 0, nil
 }
 
 func InsertCachedPrice(db *sqlx.DB, payload map[string]any) (bool, error) {
@@ -104,6 +178,22 @@ func InsertCachedPrice(db *sqlx.DB, payload map[string]any) (bool, error) {
 func CleanCachedPrices(db *sqlx.DB, id int) error {
 	q := `delete from tboardgamepricescached where store_id = ?`
 	_, err := db.Exec(q, id)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func DeleteCachedPrices(db *sqlx.DB) error {
+	q := `delete from tboardgamepricescached`
+	_, err := db.Exec(q)
+	if err != nil {
+		return err
+	}
+
+	q = `delete from tboardgameprices where boardgame_id is null and mapped = 0`
+	_, err = db.Exec(q)
 	if err != nil {
 		return err
 	}
@@ -152,16 +242,13 @@ func PriceExists(db *sqlx.DB, payload map[string]any) (*sql.NullInt64, *sql.Null
 	return &rs.Id, &rs.BoardgameId, nil
 }
 
-func UpdatePrice(db *sqlx.DB, payload map[string]any) error {
+func MapPrice(db *sqlx.DB, payload any) error {
 	q := `
 		update
 			tboardgameprices
 		set
-			store_thumb = :store_thumb,
-			stock = :stock,
-			price = :price,
-			url = :url,
-			batch = 1
+			batch = 1,
+			mapped = 1
 		where
 			id = :id
 	`
@@ -173,7 +260,30 @@ func UpdatePrice(db *sqlx.DB, payload map[string]any) error {
 	return nil
 }
 
-func InsertMapping(db *sqlx.DB, payload map[string]any) (bool, error) {
+func UpdatePrice(db *sqlx.DB, payload map[string]any) error {
+	q := `
+		update
+			tboardgameprices
+		set
+			store_thumb = :store_thumb,
+			stock = :stock,
+			price = :price,
+			url = :url,
+			batch = 1,
+			mapped = 1
+		where
+			id = :id and
+			boardgame_id is not null
+	`
+	_, err := db.NamedExec(q, payload)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func InsertMapping(db *sqlx.DB, payload any) (bool, error) {
 	q := `
 		insert into tboardgamepricesmap (
 			boardgame_id,
@@ -197,7 +307,7 @@ func InsertMapping(db *sqlx.DB, payload map[string]any) (bool, error) {
 	return rows > 0, nil
 }
 
-func InsertHistories(db *sqlx.DB, payload map[string]any) (bool, error) {
+func InsertHistories(db *sqlx.DB, payload any) (bool, error) {
 	q := `
 		insert into	tboardgamepriceshistory (
 			boardgame_id,

@@ -42,7 +42,7 @@ var (
 	IDs = map[string]any{
 		"avalongames":     25,
 		"boardsofmadness": 16,
-		"crystallotus":    26,
+		"crystallotus":    24,
 		"efantasy":        8,
 		"epitrapezio":     15,
 		"fantasyshop":     28,
@@ -73,25 +73,15 @@ func removeAccents(s string) string {
 	return output
 }
 
-func SetupIgnored(ignored []string) []string {
-	rs := []string{}
-
-	for _, item := range ignored {
-		check := strings.ToLower(item)
-		check = removeAccents(check)
-		rs = append(rs, check)
-	}
-
-	return rs
-}
-
-func Ignore(ignored []string, name string) bool {
+func Ignore(ignored []Ignored, name string, store_id int64) bool {
 	val := strings.ToLower(name)
 	val = removeAccents(val)
 
 	for _, ignore := range ignored {
-		if strings.Contains(val, ignore) {
-			return true
+		if ignore.StoreId == store_id {
+			if strings.Contains(val, ignore.Name) {
+				return true
+			}
 		}
 	}
 
