@@ -87,6 +87,23 @@ func GetIgnored(db *sqlx.DB) ([]Ignored, error) {
 	return retval, nil
 }
 
+func GetIgnoredNames(db *sqlx.DB) ([]string, error) {
+	var rs []string
+	err := db.Select(&rs, "select name from tboardgamenamesignored")
+	if err != nil {
+		return nil, err
+	}
+
+	retval := []string{}
+	for _, item := range rs {
+		check := strings.ToLower(item)
+		check = removeAccents(check)
+		retval = append(retval, check)
+	}
+
+	return retval, nil
+}
+
 // func SetIgnored(db *sqlx.DB, name string) error {
 // 	q := `insert into tboardgamepricesignored (name) values (:name)`
 // 	_, err := db.NamedExec(q, map[string]any{

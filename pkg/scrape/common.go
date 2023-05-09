@@ -73,9 +73,15 @@ func removeAccents(s string) string {
 	return output
 }
 
-func Ignore(ignored []Ignored, name string, store_id int64) bool {
+func Ignore(ignored []Ignored, ignored_names []string, name string, store_id int64) bool {
 	val := strings.ToLower(name)
 	val = removeAccents(val)
+
+	for _, name := range ignored_names {
+		if strings.Contains(val, name) {
+			return true
+		}
+	}
 
 	for _, ignore := range ignored {
 		if ignore.StoreId == store_id {

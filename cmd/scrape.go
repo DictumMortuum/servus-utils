@@ -17,7 +17,7 @@ var (
 	Cfg Config
 )
 
-func scrapeSingle(db *sqlx.DB, f func() (map[string]any, []map[string]any, error), ign []scrape.Ignored) error {
+func scrapeSingle(db *sqlx.DB, f func() (map[string]any, []map[string]any, error), ign []scrape.Ignored, ign_names []string) error {
 	metadata, rs, err := f()
 	if err != nil {
 		return err
@@ -30,7 +30,7 @@ func scrapeSingle(db *sqlx.DB, f func() (map[string]any, []map[string]any, error
 
 	for _, item := range rs {
 		if val, ok := item["name"]; ok {
-			ignore := scrape.Ignore(ign, val.(string), metadata["id"].(int64))
+			ignore := scrape.Ignore(ign, ign_names, val.(string), metadata["id"].(int64))
 			if !ignore {
 				id, boardgame_id, err := scrape.PriceExists(db, item)
 				if err != nil {
@@ -114,6 +114,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	names_ignored, err := scrape.GetIgnoredNames(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	app := &cli.App{
 		Commands: []*cli.Command{
 			{
@@ -142,7 +147,7 @@ func main() {
 
 					for _, val := range scrapers {
 						if f, ok := scrape.Scrapers[val].(func() (map[string]any, []map[string]any, error)); ok {
-							err := scrapeSingle(db, f, db_ignored)
+							err := scrapeSingle(db, f, db_ignored, names_ignored)
 							if err != nil {
 								return err
 							}
@@ -161,7 +166,7 @@ func main() {
 					}
 
 					for _, price := range prices {
-						if scrape.Ignore(db_ignored, price.Name, price.StoreId) {
+						if scrape.Ignore(db_ignored, names_ignored, price.Name, price.StoreId) {
 							err = scrape.IgnorePrice(db, price.Id)
 							if err != nil {
 								return err
@@ -176,7 +181,7 @@ func main() {
 
 					deleted := 0
 					for _, price := range cached_prices {
-						if scrape.Ignore(db_ignored, price.Name, price.StoreId) {
+						if scrape.Ignore(db_ignored, names_ignored, price.Name, price.StoreId) {
 							err = scrape.DeleteCachedPrice(db, price.Id)
 							if err != nil {
 								return err
