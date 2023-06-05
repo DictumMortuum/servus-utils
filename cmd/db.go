@@ -29,3 +29,24 @@ func saveStats(s *models.Modem, id string) error {
 
 	return nil
 }
+
+func saveTragedy(title, section, part, url string) error {
+	db, err := sqlx.Connect("mysql", Cfg.Databases["mariadb"])
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	q := `insert into ttragedy (title, section, part, url) values (:title, :section, :part, :url) on duplicate key update id = id`
+	_, err = db.NamedExec(q, map[string]any{
+		"title":   title,
+		"section": section,
+		"part":    part,
+		"url":     url,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

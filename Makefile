@@ -9,6 +9,7 @@ build: format
 	go build $(GOARGS) -o scsd ./cmd/connection_status_modem_d.go $(DEPENDENCIES)
 	go build $(GOARGS) -o sds  ./cmd/download_subtitles.go
 	go build $(GOARGS) -o scrape ./cmd/scrape.go $(DEPENDENCIES)
+	go build $(GOARGS) -o tragedy ./cmd/tragedy.go $(DEPENDENCIES)
 
 format:
 	gofmt -s -w ./cmd ./pkg
