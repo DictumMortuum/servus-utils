@@ -1,10 +1,8 @@
 package scrape
 
 import (
-	"fmt"
 	"github.com/gocolly/colly/v2"
 	"log"
-	// "strconv"
 	"strings"
 	"unicode"
 )
@@ -55,35 +53,13 @@ func ScrapeMysteryBay() (map[string]any, []map[string]any, error) {
 		rs = append(rs, item)
 	})
 
-	// collector.OnHTML("a.skOBQqy", func(e *colly.HTMLElement) {
-	// 	page := strings.Split(e.Attr("data-hook"), "-")
+	collector.OnHTML("a[data-hook=next]", func(e *colly.HTMLElement) {
+		link := e.Attr("href")
+		log.Println("Visiting: " + link)
+		collector.Visit(link)
+	})
 
-	// 	if len(page) > 1 {
-	// 		l, _ := strconv.Atoi(page[1])
-
-	// 		for i := 1; i <= l; i++ {
-	// 			link := fmt.Sprintf("%s%d", getPage(e.Request.AbsoluteURL("")), i)
-	// 			log.Println("Visiting: " + link)
-	// 			collector.Visit(link)
-	// 		}
-	// 	}
-	// })
-
-	for i := 1; i < 20; i++ {
-		log.Println("Visiting: ", i)
-		collector.Visit(fmt.Sprintf("https://www.mystery-bay.com/diaxeirisis-poron?page=%d", i))
-		collector.Visit(fmt.Sprintf("https://www.mystery-bay.com/stratigikis?page=%d", i))
-		collector.Visit(fmt.Sprintf("https://www.mystery-bay.com/fantasias?page=%d", i))
-		collector.Visit(fmt.Sprintf("https://www.mystery-bay.com/mystirioy-tromoy?page=%d", i))
-		collector.Visit(fmt.Sprintf("https://www.mystery-bay.com/paixnidia-me-miniatoyres-dungeon-cr?page=%d", i))
-		collector.Visit(fmt.Sprintf("https://www.mystery-bay.com/oikogeneiaka?page=%d", i))
-		collector.Visit(fmt.Sprintf("https://www.mystery-bay.com/tis-pareas?page=%d", i))
-		collector.Visit(fmt.Sprintf("https://www.mystery-bay.com/paixnidia-me-kartes-zaria?page=%d", i))
-		collector.Visit(fmt.Sprintf("https://www.mystery-bay.com/lcg?page=%d", i))
-		collector.Visit(fmt.Sprintf("https://www.mystery-bay.com/war-games?page=%d", i))
-		collector.Visit(fmt.Sprintf("https://www.mystery-bay.com/pre-orders?page=%d", i))
-	}
-
+	collector.Visit("https://www.mystery-bay.com/epitrapezia-paixnidia")
 	collector.Wait()
 
 	return map[string]interface{}{
