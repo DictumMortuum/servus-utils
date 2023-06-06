@@ -95,6 +95,7 @@ func main() {
 	defer browser.MustClose()
 
 	page := browser.MustPage("http://192.168.2.254")
+	defer page.Close()
 	page.MustElement(`#userName`).MustWaitVisible()
 	page.MustElement(`#userName`).MustInput("admin")
 	page.MustElement(`div.row:nth-child(4) > div:nth-child(1) > input:nth-child(1)`).MustInput("bd8rne2b")
@@ -102,6 +103,7 @@ func main() {
 	page.MustElement(`li.main-menu:nth-child(6) > a:nth-child(1) > span:nth-child(1)`).MustWaitVisible()
 
 	dsl := page.MustNavigate(`http://192.168.2.254/status-and-support.html#sub=1&subSub=66`)
+	defer dsl.Close()
 	dsl.MustWaitStable()
 	parseDSL(dsl, &s)
 	// screenshot(dsl, "scr.png")
