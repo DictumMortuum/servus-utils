@@ -11,6 +11,7 @@ import (
 	"github.com/ysmood/gson"
 	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 	"time"
 )
@@ -114,6 +115,11 @@ func main() {
 
 	s.Host = modem.Host
 	err = saveStats(&s, modem.Modem)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = os.RemoveAll("/tmp/rod")
 	if err != nil {
 		log.Fatal(err)
 	}
